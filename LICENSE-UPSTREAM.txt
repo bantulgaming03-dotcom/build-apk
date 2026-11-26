@@ -1,0 +1,2 @@
+This build uses the GPL-3.0 licensed RedBox PC Emulator project.
+See: https://github.com/RedBoxEmu/RedBox-PC-Emulator

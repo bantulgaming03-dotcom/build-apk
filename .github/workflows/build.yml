@@ -1,17 +1,24 @@
-name: Build Android APK
+name: Build Renzz Windows VM
 
 on:
   workflow_dispatch:
   push:
     branches: ["main", "master"]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout launcher repository
         uses: actions/checkout@v4
+
+      - name: Clone RedBox QEMU Android backend
+        run: |
+          git clone --depth 1 --branch v1.1.0 https://github.com/RedBoxEmu/RedBox-PC-Emulator.git redbox
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -20,17 +27,61 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Build debug APK
-        run: gradle assembleDebug --stacktrace
+      - name: Install Android build tools
+        run: |
+          sdkmanager "platforms;android-37" \
+                      "build-tools;35.0.0" \
+                      "cmake;3.22.1" \
+                      "ndk;27.2.12479018"
+
+      - name: Apply Renzz branding
+        working-directory: redbox
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("app/src/main/res/values/strings.xml")
+          s = p.read_text(encoding="utf-8")
+          s = s.replace("RedBox PC Emulator", "Renzz Windows")
+          p.write_text(s, encoding="utf-8")
+
+          p = Path("README.md")
+          if p.exists():
+              s = p.read_text(encoding="utf-8")
+              if "Created By Renzz" not in s:
+                  s += "\n\nCreated By Renzz\n"
+              p.write_text(s, encoding="utf-8")
+          PY
+
+      - name: Build Android APK
+        working-directory: redbox
+        env:
+          ANDROID_NDK_VERSION: "27.2.12479018"
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: |
+          mkdir -p output
+          cp redbox/app/build/outputs/apk/debug/*.apk output/Renzz-Windows-QEMU-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Renzz-Windows-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: Renzz-Windows-QEMU
+          path: output/Renzz-Windows-QEMU-debug.apk
           if-no-files-found: error
+
+      - name: Upload build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: |
+            redbox/app/build/outputs/logs/**
+            redbox/app/build/reports/**
+          if-no-files-found: ignore
