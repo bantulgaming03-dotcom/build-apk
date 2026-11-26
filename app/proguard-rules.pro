@@ -1,1 +1,1 @@
-# Aturan ProGuard (minify dimatikan untuk saat ini)
+# Project-specific ProGuard/R8 rules.
